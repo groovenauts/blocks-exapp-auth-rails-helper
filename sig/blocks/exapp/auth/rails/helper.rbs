@@ -1,0 +1,12 @@
+module Blocks
+  module Exapp
+    module Auth
+      module Rails
+        module Helper
+          VERSION: String
+          # See the writing guide of rbs: https://github.com/ruby/rbs#guides
+        end
+      end
+    end
+  end
+end
