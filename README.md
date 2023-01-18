@@ -1,29 +1,64 @@
-# Blocks::Exapp::Auth::Rails::Helper
+# blocks-exapp-auth-rails-helper
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/blocks/exapp/auth/rails/helper`. To experiment with that code, run `bin/console` for an interactive prompt.
-
-TODO: Delete this and the text above, and describe your gem
+BLOCKS外部アプリ認証と連係するためのRails用のヘルパーメソッドです。
 
 ## Installation
 
-Install the gem and add to the application's Gemfile by executing:
+rubygems.org にはリリースしていないので Gemfile に GitHub リポジトリの参照を記述します
 
-    $ bundle add blocks-exapp-auth-rails-helper
-
-If bundler is not being used to manage dependencies, install the gem by executing:
-
-    $ gem install blocks-exapp-auth-rails-helper
+    gem "blocks-exapp-auth-rails-helper", git: "https://github.com/groovenauts/blocks-exapp-auth-rails-helper.git", tag: "v1"
 
 ## Usage
 
-TODO: Write usage instructions here
+任意のコントローラーに `Blocks::Exapp::Auth::Rails::Helper` メソッドを include することで `blocks_exapp_authenticate` メソッドが利用可能になります。
 
-## Development
+ex)
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+```ruby
+class ApplicationController < ActionController::Base
+  include Blocks::Exapp::Auth::Rails::Helper
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and the created tag, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+  before_action :blocks_exapp_authenticate
 
-## Contributing
+  rescue_from Blocks::Exapp::Auth::Rails::Helper::AuthenticationError, with: :blocks_auth_error
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/nagachika/blocks-exapp-auth-rails-helper.
+  def blocks_auth_error(exception=nil)
+    render json: { error: exception&.message }, status: :unauthorized
+  end
+end
+```
+
+この例では magellan-console で認証エラーが発生した場合 `Blocks::Exapp::Auth::Rails::Helper::AuthenticationError` 例外が発生するので、
+`rescue_from` で捕捉しています。
+
+アクションで処理したい場合は around action フィルタを利用します。
+
+ex) (認証失敗時にフィルタを止めず個別のアクションを実行したい場合)
+```ruby
+class ApplicationController < ActionController::Base
+  include Blocks::Exapp::Auth::Rails::Helper
+
+  acount_action :authenticate
+
+  private def authenticate
+    begin
+      blocks_exapp_authenticate
+    rescue Blocks::Exapp::Auth::Rails::Helper::AuthenticationError => e
+      @error = e.message
+    end
+    yield
+  end
+end
+```
+
+外部アプリ認証のために必要なパラーメータは `Rails.application.config` で指定します。
+たとえば以下のような `config/initializers/blocks_exapp_auth.rb` を作成します(この例では具体的な値は環境変数で渡します)。
+
+```ruby
+# freeze-string-literal: true
+
+Rails.application.config.blocks_exapp_secret = ENV["MYAPP_BLOCKS_SECRET"] || ""
+Rails.application.config.blocks_exapp_token = ENV["MYAPP_BLOCKS_TOKEN"] || ""
+Rails.application.config.blocks_console_url = ENV["MYAPP_BLOCKS_CONSOLE_URL"]
+```
+
